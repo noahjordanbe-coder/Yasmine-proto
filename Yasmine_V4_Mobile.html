@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05090c">
+<title>Yasmine — V1</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#05090c;color:#eefcff;font-family:Arial,sans-serif;min-height:100vh;display:flex;justify-content:center}.app{width:100%;max-width:520px;min-height:100vh;padding:22px 18px 18px;display:flex;flex-direction:column}header{display:flex;justify-content:space-between;align-items:center}.brand{font-size:25px;font-weight:700;letter-spacing:3px}.status{font-size:12px;color:#66f5d1;display:flex;gap:7px;align-items:center}.dot{width:8px;height:8px;border-radius:50%;background:#66f5d1;box-shadow:0 0 12px #66f5d1}.orb-wrap{display:flex;justify-content:center;margin:52px 0 28px}.orb{cursor:pointer;user-select:none;transition:.25s;width:175px;height:175px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 45% 40%,#9ffff0 0,#39d8c0 13%,#126b68 38%,#091b21 68%,#05090c 70%);box-shadow:0 0 25px #25d9c655,0 0 80px #25d9c622;animation:pulse 3s infinite}@keyframes pulse{50%{transform:scale(1.035)}}.orb span{font-size:15px;letter-spacing:2px}.orb.always{box-shadow:0 0 22px #25d9c688,0 0 70px #25d9c622}.orb.listening{box-shadow:0 0 35px #66f5d1,0 0 110px #25d9c266;transform:scale(1.08)}.greeting{text-align:center;color:#9fb2b8;font-size:15px;margin-bottom:16px}.chat{flex:1;min-height:170px;overflow:auto;padding:8px 0}.msg{padding:12px 14px;border-radius:16px;margin:8px 0;max-width:88%;line-height:1.4}.y{background:#0c181d;border:1px solid #173238;margin-right:auto}.n{background:#123d3b;margin-left:auto}.controls{display:flex;gap:9px;margin-top:10px}input{flex:1;background:#0b1216;border:1px solid #1c343b;color:white;border-radius:16px;padding:14px;font-size:15px;outline:none}button{border:0;border-radius:16px;background:#55e6ca;color:#06100f;font-weight:700;padding:0 17px;font-size:15px}.mic{width:58px;height:50px;padding:0;border-radius:50%;font-size:20px}.help{text-align:center;color:#60747a;font-size:11px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div class="brand">YASMINE</div><div class="status"><i class="dot"></i> EN LIGNE</div></header>
+<div class="orb-wrap"><div class="orb" id="orb" role="button" tabindex="0"><span id="orbText">VEILLE</span></div></div>
+<div class="greeting">Bonjour Noah. Je suis prête.</div>
+<div class="chat" id="chat"><div class="msg y">Bonjour Noah. Je suis Yasmine. Dis-moi ce que tu veux faire.</div></div>
+<div class="controls"><input id="input" placeholder="Écris à Yasmine…" autocomplete="off"><button id="send">➤</button><button id="mic" class="mic">🎙️</button></div>
+<div class="help">🎙️ Autorise le micro si Android le demande • Yasmine V1</div>
+</div>
+<script>
+const chat=document.getElementById('chat'),input=document.getElementById('input');
+const orb=document.getElementById('orb'),orbText=document.getElementById('orbText');
+const sendBtn=document.getElementById('send'),micBtn=document.getElementById('mic');
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let recognition=null, alwaysOn=false, conversation=false, restarting=false;
+
+function add(t,w){const d=document.createElement('div');d.className='msg '+w;d.textContent=t;chat.appendChild(d);chat.scrollTop=chat.scrollHeight}
+function speak(t,done){
+ if(!('speechSynthesis'in window)){if(done)done();return}
+ speechSynthesis.cancel(); const vs=speechSynthesis.getVoices();
+ const v=vs.find(x=>/fr/i.test(x.lang)&&/amelie|audrey|female|google français|microsoft/i.test(x.name))||vs.find(x=>/fr/i.test(x.lang));
+ const u=new SpeechSynthesisUtterance(t);u.lang='fr-FR';u.rate=.9;u.pitch=1.12;if(v)u.voice=v;
+ u.onend=()=>done&&done();speechSynthesis.speak(u);
+}
+function reply(t){let s=t.toLowerCase();
+ if(s.includes('mysterysnacks'))return"Je m'en souviens. MysterySnacks est ton projet.";
+ if(s.includes('qui es-tu'))return"Je suis Yasmine, ton assistante personnelle.";
+ if(s.includes('bonjour')||s.includes('salut'))return"Salut Noah. Qu'est-ce qu'on construit aujourd'hui ?";
+ if(s.includes('merci'))return"Avec plaisir. Je suis là.";
+ return"J'ai bien reçu ta demande. Mon cerveau IA sera connecté dans une prochaine étape.";
+}
+function setState(state){
+ orb.classList.toggle('always',state==='veille');orb.classList.toggle('listening',state==='ecoute');
+ orbText.textContent=state==='ecoute'?'ÉCOUTE':state==='veille'?'VEILLE':'PRÊTE';
+}
+function stopRecognition(){if(recognition){try{recognition.onend=null;recognition.stop()}catch(e){}recognition=null}}
+function startConversation(){
+ if(!SR)return add("La reconnaissance vocale n'est pas disponible. Utilise Chrome sur Android.",'y');
+ stopRecognition(); conversation=true; setState('ecoute'); add("Je t'écoute…",'y');
+ recognition=new SR();recognition.lang='fr-FR';recognition.continuous=false;recognition.interimResults=false;
+ recognition.onresult=e=>{let t=e.results?.[0]?.[0]?.transcript||'';if(t){add(t,'n');let r=reply(t);add(r,'y');speak(r,()=>{conversation=false;if(alwaysOn)startWake();});}};
+ recognition.onerror=()=>{conversation=false;if(alwaysOn)startWake()};
+ recognition.onend=()=>{recognition=null;if(conversation){conversation=false;if(alwaysOn)startWake()}};
+ try{recognition.start()}catch(e){}
+}
+function startWake(){
+ if(!alwaysOn||conversation||recognition||!SR)return;
+ setState('veille');
+ recognition=new SR();recognition.lang='fr-FR';recognition.continuous=false;recognition.interimResults=false;
+ recognition.onresult=e=>{let t=e.results?.[0]?.[0]?.transcript?.toLowerCase()||'';recognition=null;
+   if(t.includes('yasmine')){speak("Oui, je t'écoute.",startConversation)} else setTimeout(startWake,250);
+ };
+ recognition.onerror=()=>{recognition=null;if(alwaysOn)setTimeout(startWake,500)};
+ recognition.onend=()=>{if(recognition){recognition=null;if(alwaysOn)setTimeout(startWake,250)}};
+ try{recognition.start()}catch(e){recognition=null;setTimeout(startWake,700)}
+}
+function toggleAlways(){
+ alwaysOn=!alwaysOn;
+ if(alwaysOn){add("Mode toujours à l'écoute activé. Dis « Yasmine » pour m'appeler.",'y');startWake()}
+ else {stopRecognition();conversation=false;setState('pret');add("Mode veille désactivé.",'y')}
+}
+orb.onclick=toggleAlways;orb.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')toggleAlways()};
+micBtn.onclick=startConversation;
+sendBtn.onclick=()=>{let t=input.value.trim();if(!t)return;input.value='';add(t,'n');let r=reply(t);add(r,'y');speak(r)};
+input.addEventListener('keydown',e=>{if(e.key==='Enter')sendBtn.click()});
+if('speechSynthesis'in window)speechSynthesis.onvoiceschanged=()=>{};
+</script>
+</body>
+</html>
